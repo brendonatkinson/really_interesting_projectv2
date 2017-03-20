@@ -60,7 +60,3 @@ def verify_output(ownid, input_ports, entry):
     if int(entry[1]) not in range(0,16):
         raise Exception
     return True
-
-
-config = 'config1.txt'
-build_table(config)
