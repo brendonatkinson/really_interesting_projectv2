@@ -2,6 +2,8 @@
 # Brendon Atkinson & Callum Sinclair
 # 20 March 2016
 
+from entry import Entry
+
 def build_table(config_file):
     # Opens config file, reads and returns routerid, input ports, routing table
     # @param config_file the filename of the configuration file
@@ -35,7 +37,7 @@ def build_table(config_file):
             id = entry[2]
             port = int(entry[0])
             cost = int(entry[1])
-            routing_table.append([entry[2],int(entry[0]),int(entry[1]), flag, timer])
+            routing_table.append(Entry([id,port,cost, None]))
     return routerid[1], input_ports, routing_table
 
 

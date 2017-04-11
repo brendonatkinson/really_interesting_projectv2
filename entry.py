@@ -1,6 +1,7 @@
 # COSC364 Assignment 1
 # Brendon Atkinson & Callum Sinclair
 # 11 April 2016
+import time
 
 class Entry(object):
 
@@ -9,14 +10,16 @@ class Entry(object):
         self.address = update[1]
         self.metric = update[2]
         self.next_hop = update[3]
-        self.timeout = 180
+        self.timeout = time.time() + 180
         self.garbage = None
         self.change_flag = False
+        self.expired_flag = False
 
     def reset_timeout(self):
-        self.timeout = 180
+        self.timeout = time.time() + 180
 
     def expired(self):
         self.metric = 16
-        self.garbage = 120
+        self.garbage = time.time() + 120
         self.change_flag = True
+        self.expired_flag = True
