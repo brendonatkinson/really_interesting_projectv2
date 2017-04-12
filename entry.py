@@ -1,11 +1,14 @@
 # COSC364 Assignment 1
 # Brendon Atkinson & Callum Sinclair
-# 11 April 2016
+# 11 April 2017
 import time
 
 class Entry(object):
 
     def __init__(self, update):
+        
+        print(update)
+        
         self.destination = update[0]
         self.address = update[1]
         self.metric = update[2]

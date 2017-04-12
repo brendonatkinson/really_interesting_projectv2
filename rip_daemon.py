@@ -1,3 +1,7 @@
+# COSC364 Assignment 1
+# Brendon Atkinson & Callum Sinclair
+# 23 March 2017
+
 import router
 import sys
 import sched, time, random

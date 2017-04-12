@@ -1,3 +1,7 @@
+# COSC364 Assignment 1
+# Brendon Atkinson & Callum Sinclair
+# 20 March 2017
+
 import socket
 import select
 import time
@@ -26,6 +30,10 @@ class Router(object):
             self.serve_list.append(neighbour_socket)
             print("Listening on port: " + neighbour_port)
         
+        #Socket for sending updates
+        self.output_socket = self.serve_list[0]
+        
+        
         print("Router Initalised")
 
     # Check all input ports for a packet
@@ -46,34 +54,33 @@ class Router(object):
         return recieved_updates
             
     # Simple function to send a packet
-    # Needs to be implemented
-    def send_packet(self, destination_entry, type):
+    def send_packet(self, destination_address, rip_type):
         
         # Simple message
         message = bytes("Hello", 'utf-8')
-        port_to_send = self.routing_table[0][1]
-        print("sending to " + str(port_to_send))
+        print("sending to " + str(destination_address))
         
         # Send a simple packet
-        self.serve_list[0].sendto(message, (self.UDP_IP, port_to_send))
+        self.output_socket.sendto(message, (self.UDP_IP, destination_address))
 
     def send_table(self):
         print("Sending table update")
 
         # Send Response packets to each neighbour (unsolicited)
-        type = "response"
+        rip_type = "response"
         for neighbour in self.routing_table:
-            self.send_packet(neighbour, type)
+            self.send_packet(neighbour.address, rip_type)
 
         # Process response packets from neighbours
         data = self.read_input_ports()
         self.process_packets(data)
-
+        
         #Schedule another unsolicted update
         self.scheduler.enter(30+random.randint(0,5), 1, self.send_table, argument=())
 
-    def process_packets(data):
-        None
+    def process_packets(self, data):
+        print("Processing: ")
+        print(data)
         # To Do
         # Check validity of packets (ip, port, values, flags, e.t.c)
         # If valid:

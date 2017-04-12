@@ -1,6 +1,6 @@
 # COSC364 Assignment 1
 # Brendon Atkinson & Callum Sinclair
-# 20 March 2016
+# 20 March 2017
 
 from entry import Entry
 
@@ -37,7 +37,8 @@ def build_table(config_file):
             id = entry[2]
             port = int(entry[0])
             cost = int(entry[1])
-            routing_table.append(Entry([id,port,cost, None]))
+            #Set the next hop to the id of the link
+            routing_table.append(Entry([id,port,cost,id]))
     return routerid[1], input_ports, routing_table
 
 
