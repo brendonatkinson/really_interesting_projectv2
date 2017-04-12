@@ -6,7 +6,10 @@ import socket
 import select
 import time
 import random
+import packet
 
+RIP_RESPONCE_COMMAND = 2
+RIP_VERSION = 2
 
 class Router(object):
 
@@ -16,7 +19,7 @@ class Router(object):
         self.UDP_IP = "127.0.0.1"
         
         # Get the values from the config file.
-        self.routerid = config[0]
+        self.router_id = config[0]
         self.neighbours = config[1]
         self.routing_table = config[2]
         self.serve_list = []
@@ -36,9 +39,8 @@ class Router(object):
         
         print("Router Initalised")
 
-    # Check all input ports for a packet
     def read_input_ports(self):
-        
+        """Check for packets on all input ports"""
         # Find ready sockets
         # Timeout value set to one second
         ready_to_read, ready_to_write, in_error = select.select(self.serve_list,
@@ -47,29 +49,32 @@ class Router(object):
                                                                 1)
         recieved_updates = []
         for sockets in ready_to_read:
-            # Buffer Size = 1024
-            data, address = sockets.recvfrom(1024)
+            #Max Packet Size = 504 Bytes / 4032 Bits
+            data, address = sockets.recvfrom(4032)
             recieved_updates.append((address, data))
 
         return recieved_updates
             
-    # Simple function to send a packet
-    def send_packet(self, destination_address, rip_type):
-        
-        # Simple message
-        message = bytes("Hello", 'utf-8')
+    def send_packet(self, destination_address, rip_packet):
+        """Simple function to send a packet"""
+        # Debugging output
         print("sending to " + str(destination_address))
         
         # Send a simple packet
-        self.output_socket.sendto(message, (self.UDP_IP, destination_address))
+        self.output_socket.sendto(rip_packet, (self.UDP_IP, destination_address))
 
     def send_table(self):
+        """Sends the entire routing table to neighbours"""
         print("Sending table update")
 
         # Send Response packets to each neighbour (unsolicited)
         rip_type = "response"
         for neighbour in self.routing_table:
-            self.send_packet(neighbour.address, rip_type)
+            rip_packet = packet.Packet(int(self.router_id), RIP_RESPONCE_COMMAND)
+            for entry in self.routing_table:
+                rip_packet.add_entry(entry)
+            
+            self.send_packet(neighbour.address, rip_packet.pack())
 
         # Process response packets from neighbours
         data = self.read_input_ports()
@@ -79,19 +84,70 @@ class Router(object):
         self.scheduler.enter(30+random.randint(0,5), 1, self.send_table, argument=())
 
     def process_packets(self, data):
-        print("Processing: ")
-        print(data)
-        # To Do
-        # Check validity of packets (ip, port, values, flags, e.t.c)
-        # If valid:
-        # Update information in table if better than existing information
-        # Send Poison - Reverse packets
-        # Else
-        # Ignore
+        """Decodes packet, checks if valid data, determines if update required"""
+        print("Processing")
+        
+        #Needs Error Checking
+        
+        if (len(data) > 0):
+            #Tuple of senders (ip_address, port_number)
+            network_information = data[0][0]
 
+            #UDP Packet Information
+            rip_data = data[0][1]
+            
+            #Create a packet object to decode data correctly
+            rip_packet = packet.Packet(int(self.router_id), RIP_RESPONCE_COMMAND)
+            rip_data = rip_packet.unpack(rip_data)
+            
+            #Get the RIP header data
+            header = rip_data[0]
+            recieved_id = header.router_id
+            print("Recieved Update from " + str(recieved_id))
+            
+            #Get the routing table corresponding to the router packet recieved from
+            recieved_entry = None
+            for routing_entry in self.routing_table:
+                if (str(routing_entry.destination) == str(recieved_id)):
+                    recieved_entry = routing_entry
+            
+            #Iterate through all the routing data information
+            for entry in rip_data[1:]:
+                
+                #Get the routing table corresponding to this entry
+                rip_entry = None
+                for routing_entry in self.routing_table:
+                    if (str(routing_entry.destination) == str(entry.destination)):
+                        rip_entry = routing_entry
+                
+                if (rip_entry != None):
+                    
+                    #Debugging
+                    #print("Router: " + str(entry.destination))
+                    #print("Cost: " + str(entry.metric))
+                    #print("Hop: " + str(recieved_entry.metric))
+                    #print("Cost + Hop: " + str(entry.metric + recieved_entry.metric))
+                    #print("Current Best :" + str(rip_entry.metric))
+                    
+                    #Check if lower cost route, update and sen
+                    if ((entry.metric + recieved_entry.metric) < rip_entry.metric):
+                        print("Updating Entry")
+                        self.update_routing_entry(rip_entry, (entry.metric + recieved_entry.metric), recieved_id)
+                        rip_packet.add_entry(rip_entry)
+             
+            #Check if triggered update required           
+            if (len(rip_packet.entries) > 0):
+                print("Triggered")
+     
+    def update_routing_entry(self, entry, new_cost, next_hop):
+    
+        entry.metric = new_cost
+        entry.next_hop = next_hop
+        entry.reset_timeout()
+    
     def update_timers(self):
+        """Update the routing table timers"""
         print("Timer update")
-
         for neighbour in self.routing_table:
             curr_timeout = time.time() - neighbour.timeout
             if curr_timeout >= 0:

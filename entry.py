@@ -6,9 +6,6 @@ import time
 class Entry(object):
 
     def __init__(self, update):
-        
-        print(update)
-        
         self.destination = update[0]
         self.address = update[1]
         self.metric = update[2]
@@ -19,7 +16,7 @@ class Entry(object):
         self.expired_flag = False
 
     def reset_timeout(self):
-        self.timeout = time.time() + 180
+        self.timeout = time.time() + 180     
 
     def expired(self):
         self.metric = 16
