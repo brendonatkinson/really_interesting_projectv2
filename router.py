@@ -139,19 +139,20 @@ class Router(object):
                         #Check if lower cost route, update and sen
                         if ((entry.metric + recieved_entry.metric) < rip_entry.metric):
                             print("Updating Entry")
-                            #self.update_routing_entry(rip_entry, (entry.metric + recieved_entry.metric), recieved_id)
+                            self.update_routing_entry(rip_entry, (entry.metric + recieved_entry.metric), recieved_id)
                             rip_packet.add_entry(rip_entry)
 
             #Check if triggered update required
+
+            #Is this meant to occur as soon as update or leave here?
             if (len(rip_packet.entries) > 0):
                 print("Update required")
-                #self.send_triggered_update(rip_packet.pack())
+                self.send_triggered_update(rip_packet.pack())
 
     def send_triggered_update(self, packet):
 
         for neighbour in self.routing_table:
-            print("Trig")
-            #self.send_packet(neighbour.address, packet)
+            self.send_packet(neighbour.address, packet)
      
     def update_routing_entry(self, entry, new_cost, next_hop):
         #print("Updating routing entry for: " + str(entry.destination))

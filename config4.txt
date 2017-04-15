@@ -1,0 +1,4 @@
+router-id, 3
+#comment
+input-ports, 1104
+output-ports, 1102-1-1, 1103-1-2
