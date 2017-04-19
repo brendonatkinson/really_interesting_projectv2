@@ -21,6 +21,7 @@ if __name__ == "__main__":
         router.scheduler = sched.scheduler(time.time, time.sleep)
         router.send_table()
         router.update_timers()
+        router.print_table()
         router.scheduler.run()
             
         #Never reaches here
