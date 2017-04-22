@@ -81,8 +81,9 @@ class Router(object):
             rip_packet.add_entry(entry)
 
         #  Send Response packets to each neighbour
-        for neighbour in self.routing_table:
-            self.send_packet(neighbour.address, rip_packet.pack(neighbour.address))
+        if rip_packet.entries:
+            for neighbour in self.routing_table:
+                self.send_packet(neighbour.address, rip_packet.pack(neighbour.address))
 
         #  Process response packets from neighbours
         data = self.read_input_ports()
