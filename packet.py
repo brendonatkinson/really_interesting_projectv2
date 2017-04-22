@@ -9,6 +9,7 @@ RIP_HEADER_SIZE = 4
 RIP_HEADER_FORMAT = '!BBH'
 RIP_ENTRY_SIZE = 20
 RIP_ENTRY_FORMAT = '!HHIIII'
+RIP_INFINITY = 16
 
 class Packet(object):
     
@@ -27,16 +28,22 @@ class Packet(object):
         
         self.entries.remove(entry)
         
-    def pack(self):
+    def pack(self, address):
         
-        #Build the header
+        # Build the header
         data = struct.pack(RIP_HEADER_FORMAT, self.command, self.version, self.router_id)
         
-        #Build the routing table entries
-        #TODO: Not sure this is the information we must be sending
+        # Build the routing table entries
+        # TODO: Not sure this is the information we must be sending
         for entry in self.entries:
+
+            # Poison reverse, any destinations achievable via this neighbour, set metric to infinity
+            metric = entry.metric
+            if entry.address == address:
+                metric = RIP_INFINITY
+
             data += struct.pack(RIP_ENTRY_FORMAT, int(socket.AF_INET), int(entry.destination),
-                                int(entry.next_hop), 0, 0, int(entry.metric))
+                                int(entry.next_hop), 0, 0, int(metric))
         
         return data
     

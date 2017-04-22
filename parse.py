@@ -37,8 +37,8 @@ def build_table(config_file):
             port = int(entry[0])
             cost = int(entry[1])
             # Set the next hop to the id of the link
-            routing_table.append(Entry([routerid, port, cost, id]))
-    return routerid[1], input_ports, routing_table
+            routing_table.append(Entry([routerid, port, cost, routerid]))
+    return routerid, input_ports, routing_table
 
 
 def lines(f):

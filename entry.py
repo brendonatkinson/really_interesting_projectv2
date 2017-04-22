@@ -23,3 +23,6 @@ class Entry(object):
         self.garbage = time.time() + 120
         self.change_flag = True
         self.expired_flag = True
+
+    def timeout_remaining(self):
+        return self.timeout - time.time()

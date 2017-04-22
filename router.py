@@ -73,16 +73,16 @@ class Router(object):
 
     def send_table(self):
         """Sends the entire routing table to neighbours"""
-        # print("Sending table update")
+        print("Sending table update")
 
         # Build the table entries packet
         rip_packet = packet.Packet(int(self.router_id), RIP_RESPONSE_COMMAND)
         for entry in self.routing_table:
             rip_packet.add_entry(entry)
 
-        #  Send Response packets to each neighbour (unsolicited)
+        #  Send Response packets to each neighbour
         for neighbour in self.routing_table:
-            self.send_packet(neighbour.address, rip_packet.pack())
+            self.send_packet(neighbour.address, rip_packet.pack(neighbour.address))
 
         #  Process response packets from neighbours
         data = self.read_input_ports()
@@ -131,7 +131,7 @@ class Router(object):
                         # Debugging
                         # print("Router: " + str(entry.destination))
                         # print("Cost: " + str(entry.metric))
-                        # print("Hop: " + str(recieved_entry.metric))
+                        print("Hop: " + str(recieved_entry.metric))
                         # print("Cost + Hop: " + str(entry.metric + recieved_entry.metric))
                         # print("Current Best :" + str(rip_entry.metric))
 
@@ -167,10 +167,8 @@ class Router(object):
 
         # print("Timer update")
         for neighbour in self.routing_table:
-            curr_timeout = time.time() - neighbour.timeout
-            if curr_timeout >= 0:
+            if neighbour.timeout_remainin() <= 0:
                 neighbour.expired()
-                #  poison reverse?
             if neighbour.expired_flag:
                 garbage_time = time.time() - neighbour.garbage
                 if garbage_time <= 0:
@@ -196,4 +194,4 @@ class Router(object):
         for entry in self.routing_table:
             print(" {:>2} || {:>3} | {:>2} | {:<7} | {:<8} | {:<8} |".format(entry.destination, entry.address,
                                                                              entry.metric, entry.expired_flag,
-                                                                             entry.timeout, entry.garbage))
+                                                                             entry.timeout_remaining(), entry.garbage))
