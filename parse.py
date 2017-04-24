@@ -15,9 +15,12 @@ def build_table(config_file):
         temp.append(line.split(', '))
 
     # Verify router ID
-    routerid = temp.pop(0)
-    if not ('router-id' in routerid) and (int(routerid[1]) in range(1, 64000)):
+    internal_id = temp.pop(0)
+    if not ('router-id' in internal_id) and (int(internal_id[1]) in range(1, 64000)):
         raise Exception
+
+    #Parse the router id
+    internal_id = internal_id[1]
 
     # Verify input ports
     input_ports = temp.pop(0)
@@ -32,13 +35,14 @@ def build_table(config_file):
     routing_table = []
     for entry in output_ports[1:]:
         entry = entry.split('-')
-        if verify_output(routerid, input_ports, entry):
+        if verify_output(internal_id, input_ports, entry):
             routerid = entry[2]
             port = int(entry[0])
             cost = int(entry[1])
             # Set the next hop to the id of the link
             routing_table.append(Entry([routerid, port, cost, routerid]))
-    return routerid, input_ports, routing_table
+
+    return internal_id, input_ports, routing_table
 
 
 def lines(f):

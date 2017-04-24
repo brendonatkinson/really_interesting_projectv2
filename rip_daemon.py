@@ -13,17 +13,18 @@ if __name__ == "__main__":
         print("No config file present")
     
     else:
-        #Build the router from the conifg file 
-        config = build_table(sys.argv[1])
-        router = router.Router(config)
+        try:
+            #Build the router from the conifg file
+            config = build_table(sys.argv[1])
+            router = router.Router(config)
 
-        # Create Scheduler to run tasks
-        router.scheduler = sched.scheduler(time.time, time.sleep)
-        router.send_table()
-        router.update_timers()
-        router.print_table()
-        router.scheduler.run()
-            
-        #Never reaches here
-        router.close_connections()
+            # Create Scheduler to run tasks
+            router.scheduler = sched.scheduler(time.time, time.sleep)
+            router.send_table()
+            router.update_timers()
+            router.print_table()
+            router.scheduler.run()
+        except KeyboardInterrupt:
+            #Close Connections
+            router.close_connections()
         
