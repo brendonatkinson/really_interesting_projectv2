@@ -4,9 +4,9 @@
 
 import socket
 import select
-import time
 import random
 import packet
+import entry
 
 RIP_RESPONSE_COMMAND = 2
 RIP_VERSION = 2
@@ -129,43 +129,52 @@ class Router(object):
                     print("Recieved Update from " + str(recieved_id))
 
                     # Get the routing table corresponding to the router packet recieved from
-                    recieved_entry = None
+                    physical_router_entry = None
                     for routing_entry in self.routing_table:
                         if str(routing_entry.destination) == str(recieved_id):
-                            recieved_entry = routing_entry
-                            #Link is still active, reset timers
-                            self.reset_entry_timeout(recieved_entry)
+                            physical_router_entry = routing_entry
+                            self.reset_entry_timeout(physical_router_entry)
 
                     # Iterate through all the routing data information
-                    for entry in rip_data[1:]:
+                    for advertised_route in rip_data[1:]:
                         # Get the routing table corresponding to this entry
                         rip_entry = None
                         for routing_entry in self.routing_table:
-                            if str(routing_entry.destination) == str(entry.destination):
+                            #Check if entry already exists
+                            if str(routing_entry.destination) == str(advertised_route.destination):
                                 rip_entry = routing_entry
 
+                        # If entry exists, check if better route exists.
                         if rip_entry != None:
-
-                            # Debugging
-                            # print("Router: " + str(entry.destination))
-                            # print("Cost: " + str(entry.metric))
-                            # print("Hop: " + str(recieved_entry.metric))
-                            # print("Cost + Hop: " + str(entry.metric + recieved_entry.metric))
-                            # print("Current Best :" + str(rip_entry.metric))
-                            # Check if lower cost route, update and sen
-                            if (entry.metric + recieved_entry.metric) < rip_entry.metric:
+                            # Check for better hop route
+                            if (advertised_route.metric + physical_router_entry.metric) < rip_entry.metric:
                                 print("Updating Entry")
-                                self.update_routing_entry(rip_entry, (entry.metric + recieved_entry.metric), recieved_id)
+                                self.update_routing_entry(rip_entry, (advertised_route.metric + physical_router_entry.metric), recieved_id)
                                 rip_packet.add_entry(rip_entry)
+
+                            else:
+                                hop_cost = advertised_route.metric + physical_router_entry.metric
+                                if (rip_entry.destination == advertised_route.destination and
+                                    hop_cost == rip_entry.metric):
+                                    self.reset_entry_timeout(rip_entry)
+
+                        # Create routing entry
+                        else:
+                            if (int(advertised_route.destination) != int(self.router_id)):
+                                link_cost = advertised_route.metric + physical_router_entry.metric
+                                self.routing_table.append(entry.Entry([advertised_route.destination, physical_router_entry.address,
+                                                                      link_cost,
+                                                                      physical_router_entry.destination]))
+
 
             # Check if triggered update required
 
             # Is this meant to occur as soon as update or leave here?
             if len(rip_packet.entries) > 0:
                 print("Update required")
-                self.send_triggered_update(rip_packet)
+                self.send_table_updates(rip_packet)
 
-    def send_triggered_update(self, packet):
+    def send_table_updates(self, packet):
 
         for neighbour in self.routing_table:
             self.send_packet(neighbour.address, packet.pack(neighbour.address))
@@ -185,6 +194,9 @@ class Router(object):
         # Schedule another timer update at the start, so processing time is counted
         self.scheduler.enter(5, 1, self.update_timers, argument=())
 
+        #Create a packet to send timeout updates
+        rip_packet = packet.RIP_Packet(int(self.router_id), RIP_RESPONSE_COMMAND)
+
         # print("Timer update")
         for neighbour in self.routing_table:
 
@@ -195,7 +207,17 @@ class Router(object):
                     self.routing_table.remove(neighbour)
             else:
                 if neighbour.timeout_remaining() <= 0:
+                    # Neighbour has timed out
                     neighbour.expired()
+                    # Reset all links which used this as next hop:
+                    rip_packet.add_entry(neighbour)
+
+        if len(rip_packet.entries) > 0:
+            print("Timeout related update required")
+            self.send_table_updates(rip_packet)
+
+
+
     
     def close_connections(self):
         
@@ -212,6 +234,6 @@ class Router(object):
         print(" ID ||First|Cost| Expired |Expiry |Garbage|")
         print("----++-----+----+---------+-------+-------+--")
         for entry in self.routing_table:
-            print(" {:>2} || {:>3} | {:>2} | {:<7} | {:<8} | {:<8} |".format(entry.destination, entry.next_hop,
+            print(" {:>2} || {:>3} | {:>2} | {:<7} | {:<1f} | {:<1f} |".format(entry.destination, entry.next_hop,
                                                                              entry.metric, entry.expired_flag,
                                                                              entry.timeout_remaining(), entry.garbage_remaining()))
