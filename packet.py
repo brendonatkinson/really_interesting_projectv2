@@ -114,7 +114,7 @@ class UDP_Packet(object):
         #Recompute the checksum
         checksum = hashlib.md5(udp_data[0]).digest()
         if (checksum == udp_header.checksum):
-            return udp_data[0]
+            return udp_header, udp_data[0]
         else:
             print("Checksum incorrect, dropping data!")
             return None
