@@ -10,13 +10,13 @@ class Entry(object):
         self.address = update[1]
         self.metric = update[2]
         self.next_hop = update[3]
-        self.timeout = time.time() + 180
+        self.timeout = time.time() + 40
         self.garbage = 120
         self.change_flag = False
         self.expired_flag = False
 
     def reset_timeout(self):
-        self.timeout = time.time() + 180
+        self.timeout = time.time() + 40
         self.garbage = 120
         self.change_flag = False
         self.expired_flag = False
@@ -28,7 +28,10 @@ class Entry(object):
         self.expired_flag = True
 
     def timeout_remaining(self):
-        return self.timeout - time.time()
+        if self.expired_flag:
+            return 0.0
+        else:
+            return self.timeout - time.time()
 
     def garbage_remaining(self):
         if self.expired_flag:

@@ -20,6 +20,7 @@ if __name__ == "__main__":
 
             # Create Scheduler to run tasks
             router.scheduler = sched.scheduler(time.time, time.sleep)
+            router.read_inputs()
             router.send_table()
             router.update_timers()
             router.print_table()
