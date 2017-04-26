@@ -188,17 +188,29 @@ class Router(object):
 
                         # If entry exists, check if better route exists.
                         if routing_table_entry != None:
-                            # Check for better hop route
-                            if (new_hop_cost < routing_table_entry.metric):
-                                print("Routing Table Entry Update")
-                                self.update_routing_entry(routing_table_entry,
-                                                            next_hop_entry.address,
-                                                            new_hop_cost,
-                                                            next_hop_entry.destination)
+
+                            if (advertised_destination.metric >= RIP_INFINITY and advertised_destination.next_hop == routing_table_entry.destination
+                                and not routing_table_entry.expired_flag):
+                                print("EXPIRING")
+                                routing_table_entry.expired()
+                                self.update_expired_entry(routing_table_entry,
+                                                          next_hop_entry.address,
+                                                          routing_table_entry.metric,
+                                                          routing_table_entry.destination)
                                 rip_packet.add_entry(routing_table_entry)
 
-                            if (int(routing_table_entry.next_hop) == int(recieved_id)):
-                                self.reset_entry_timeout(routing_table_entry)
+                            else:
+                                # Check for better hop route
+                                if (new_hop_cost < routing_table_entry.metric):
+                                    print("Routing Table Entry Update")
+                                    self.update_routing_entry(routing_table_entry,
+                                                                next_hop_entry.address,
+                                                                new_hop_cost,
+                                                                next_hop_entry.destination)
+                                    rip_packet.add_entry(routing_table_entry)
+
+                                if (int(routing_table_entry.next_hop) == int(recieved_id)):
+                                    self.reset_entry_timeout(routing_table_entry)
 
                         # Create a routing entry
                         else:
@@ -237,6 +249,15 @@ class Router(object):
         entry.address = address
         entry.next_hop = next_hop
         entry.reset_timeout()
+
+    def update_expired_entry(self, entry, address, new_cost, next_hop):
+        # print("Updating routing entry for: " + str(entry.destination))
+        if new_cost >= RIP_INFINITY:
+            entry.metric = RIP_INFINITY
+        else:
+            entry.metric = new_cost
+        entry.address = address
+        entry.next_hop = next_hop
 
     def reset_entry_timeout(self, entry):
         entry.reset_timeout()

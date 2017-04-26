@@ -1,0 +1,4 @@
+router-id, 7
+#comment
+input-ports, 2007
+output-ports, 20001-8-1, 2004-6-4

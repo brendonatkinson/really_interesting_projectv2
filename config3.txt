@@ -1,4 +1,4 @@
 router-id, 2
 #comment
-input-ports, 1103
-output-ports, 1102-2-1, 1104-4-3, 1105-2-4
+input-ports, 20002
+output-ports, 20001-1-1, 2003-3-3
