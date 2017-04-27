@@ -52,6 +52,11 @@ class Router(object):
         self.rip_packet_decoder = packet.RIP_Packet(int(self.router_id), RIP_RESPONSE_COMMAND)
         self.udp_packet_decoder = packet.UDP_Packet(self.output_port, 0)
 
+        # Ask for all routing tables
+        request_packet = packet.RIP_Packet(int(self.router_id), RIP_REQUEST_COMMAND)
+        for neighbour in self.routing_table:
+            self.send_packet(neighbour.address, request_packet.pack(neighbour.address))
+
         print("Router Initalised")
 
     def init_bellman_ford(self):
@@ -95,6 +100,9 @@ class Router(object):
         """Sends the entire routing table to neighbours"""
         print("Sending table update")
 
+        # Schedule another unsolicted update
+        self.scheduler.enter(30+random.randint(0, 5), 1, self.send_table, argument=())
+
         # Build the table entries packet
         rip_packet = packet.RIP_Packet(int(self.router_id), RIP_RESPONSE_COMMAND)
         for entry in self.routing_table:
@@ -105,13 +113,6 @@ class Router(object):
         if rip_packet.entries:
             for neighbour in self.routing_table:
                 self.send_packet(neighbour.address, rip_packet.pack(neighbour.address))
-
-        #  Process response packets from neighbours
-        data = self.read_input_ports()
-        self.process_packets(data)
-        
-        # Schedule another unsolicted update
-        self.scheduler.enter(30+random.randint(0, 5), 1, self.send_table, argument=())
 
     def read_inputs(self):
 
@@ -134,12 +135,12 @@ class Router(object):
 
             for datum in data:
                 #  Packet Information
-                recieved_data = datum
+                received_data = datum
 
                 # Decode UDP data
-                udp_header, udp_data = self.udp_packet_decoder.unpack(recieved_data)
+                udp_header, udp_data = self.udp_packet_decoder.unpack(received_data)
                 # If errors in checksum, packet is dropped
-                if not udp_data:
+                if udp_data:
 
                     # Decode RIP data
                     rip_data = self.rip_packet_decoder.unpack(udp_data)
@@ -148,100 +149,97 @@ class Router(object):
                     header = rip_data[0]
                     command = header.command
                     recieved_id = header.router_id
-                    # print("Recieved Update from " + str(recieved_id))
-                    if command == RIP_REQUEST_COMMAND:
-                        print("It's a request, send table?")
+                    print("Recieved Update from " + str(recieved_id))
 
-                    elif command == RIP_RESPONSE_COMMAND:
-                        # Get the routing table corresponding to the router packet recieved from
-                        # If new route discovered, set the router as the next hop
-                        next_hop_entry = None
-                        for entry in self.routing_table:
-                            if str(entry.destination) == str(recieved_id):
-                                next_hop_entry = entry
+                    # Get the routing table corresponding to the router packet recieved from
+                    # If new route discovered, set the router as the next hop
+                    next_hop_entry = None
+                    for entry in self.routing_table:
+                        if str(entry.destination) == str(recieved_id):
+                            next_hop_entry = entry
 
-                                # If router has returned from timeout, set it's distance to correct value
-                                if self.distance_table[int(recieved_id)] < next_hop_entry.metric:
-                                    self.update_routing_entry(next_hop_entry,
+                            # If router has returned from timeout, set it's distance to correct value
+                            if self.distance_table[int(recieved_id)] < next_hop_entry.metric:
+                                self.update_routing_entry(next_hop_entry,
+                                                          next_hop_entry.address,
+                                                          self.distance_table[int(recieved_id)],
+                                                          next_hop_entry.destination)
+                                rip_packet.add_entry(next_hop_entry)
+
+                    if next_hop_entry:
+
+                        # If next hop entry is first hop, reset timeout
+                        if (int(next_hop_entry.next_hop) == int(next_hop_entry.destination) and
+                           int(next_hop_entry.destination) == int(recieved_id)):
+                            self.reset_entry_timeout(next_hop_entry)
+
+                        # Iterate through all the routing data information from the router
+                        for advertised_destination in rip_data[1:]:
+
+                            # Attempt to find a entry matching this advertised destination
+                            routing_table_entry = None
+                            for entry in self.routing_table:
+                                # Check if entry already exists
+                                if str(entry.destination) == str(advertised_destination.destination):
+                                    routing_table_entry = entry
+
+                            # Bellman Ford Algorithm
+                            new_hop_cost = self.distance_table[int(recieved_id)] + advertised_destination.metric
+
+                            # If entry exists, check if better route exists.
+                            if routing_table_entry:
+
+                                # Check if advertised destination has hop cost 16 indicating host unreachable
+                                if (advertised_destination.metric >= RIP_INFINITY and advertised_destination.next_hop
+                                        == routing_table_entry.destination and not routing_table_entry.expired_flag):
+                                    # print("EXPIRING")
+                                    routing_table_entry.expired()
+                                    self.update_expired_entry(routing_table_entry,
                                                               next_hop_entry.address,
-                                                              self.distance_table[int(recieved_id)],
-                                                              next_hop_entry.destination)
-                                    rip_packet.add_entry(next_hop_entry)
+                                                              routing_table_entry.metric,
+                                                              routing_table_entry.destination)
+                                    rip_packet.add_entry(routing_table_entry)
 
-                        if next_hop_entry:
-
-                            # If next hop entry is first hop, reset timeout
-                            if (int(next_hop_entry.next_hop) == int(next_hop_entry.destination) and
-                               int(next_hop_entry.destination) == int(recieved_id)):
-                                self.reset_entry_timeout(next_hop_entry)
-
-                            # Iterate through all the routing data information from the router
-                            for advertised_destination in rip_data[1:]:
-
-                                # Attempt to find a entry matching this advertised destination
-                                routing_table_entry = None
-                                for entry in self.routing_table:
-                                    # Check if entry already exists
-                                    if str(entry.destination) == str(advertised_destination.destination):
-                                        routing_table_entry = entry
-
-                                # Bellman Ford Algorithm
-                                new_hop_cost = self.distance_table[int(recieved_id)] + advertised_destination.metric
-
-                                # If entry exists, check if better route exists.
-                                if routing_table_entry:
-
-                                    # Check if advertised destination has hop cost 16 indicating host unreachable
-                                    if (advertised_destination.metric >= RIP_INFINITY and advertised_destination.next_hop
-                                            == routing_table_entry.destination and not routing_table_entry.expired_flag):
-                                        # print("EXPIRING")
-                                        routing_table_entry.expired()
-                                        self.update_expired_entry(routing_table_entry,
-                                                                  next_hop_entry.address,
-                                                                  routing_table_entry.metric,
-                                                                  routing_table_entry.destination)
-                                        rip_packet.add_entry(routing_table_entry)
-
-                                    else:
-
-                                        # Check for better hop route
-                                        if new_hop_cost < routing_table_entry.metric:
-                                            # print("Routing Table Entry Update")
-                                            self.update_routing_entry(routing_table_entry,
-                                                                        next_hop_entry.address,
-                                                                        new_hop_cost,
-                                                                        next_hop_entry.destination)
-                                            rip_packet.add_entry(routing_table_entry)
-
-                                        if int(routing_table_entry.next_hop) == int(recieved_id):
-                                            self.reset_entry_timeout(routing_table_entry)
-
-                                # Create a routing entry
                                 else:
 
-                                    # Ensure no routing entry created for itself or loop created
-                                    if (int(advertised_destination.destination) != int(self.router_id) and
-                                            int(advertised_destination.next_hop != int(self.router_id))):
+                                    # Check for better hop route
+                                    if new_hop_cost < routing_table_entry.metric:
+                                        # print("Routing Table Entry Update")
+                                        self.update_routing_entry(routing_table_entry,
+                                                                    next_hop_entry.address,
+                                                                    new_hop_cost,
+                                                                    next_hop_entry.destination)
+                                        rip_packet.add_entry(routing_table_entry)
 
-                                        if new_hop_cost >= RIP_INFINITY:
-                                            new_hop_cost = RIP_INFINITY
+                                    if int(routing_table_entry.next_hop) == int(recieved_id):
+                                        self.reset_entry_timeout(routing_table_entry)
 
-                                        new_entry = Entry([advertised_destination.destination,
-                                                            next_hop_entry.address,
-                                                            new_hop_cost,
-                                                            next_hop_entry.destination])
-                                        self.routing_table.append(new_entry)
-                                        rip_packet.add_entry(new_entry)
-                        # Neighbour returned from garbage collection
-                        else:
+                            # Create a routing entry
+                            else:
 
-                            # print("Restore from garbage collection")
-                            new_entry = Entry([int(recieved_id),
-                                               udp_header.src,
-                                               int(self.distance_table[int(recieved_id)]),
-                                               int(recieved_id)])
-                            self.routing_table.append(new_entry)
-                            rip_packet.add_entry(new_entry)
+                                # Ensure no routing entry created for itself or loop created
+                                if (int(advertised_destination.destination) != int(self.router_id) and
+                                        int(advertised_destination.next_hop != int(self.router_id))):
+
+                                    if new_hop_cost >= RIP_INFINITY:
+                                        new_hop_cost = RIP_INFINITY
+
+                                    new_entry = Entry([advertised_destination.destination,
+                                                        next_hop_entry.address,
+                                                        new_hop_cost,
+                                                        next_hop_entry.destination])
+                                    self.routing_table.append(new_entry)
+                                    rip_packet.add_entry(new_entry)
+                    # Neighbour returned from garbage collection
+                    else:
+
+                        # print("Restore from garbage collection")
+                        new_entry = Entry([int(recieved_id),
+                                           udp_header.src,
+                                           int(self.distance_table[int(recieved_id)]),
+                                           int(recieved_id)])
+                        self.routing_table.append(new_entry)
+                        rip_packet.add_entry(new_entry)
 
             # Check if triggered update required
 

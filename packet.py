@@ -43,7 +43,7 @@ class RIP_Packet(object):
 
             # Poison reverse, any destinations achievable via this neighbour, set metric to infinity
             metric = entry.metric
-            if entry.address == address:
+            if entry.next_hop == address:
                 metric = RIP_INFINITY
 
             data += struct.pack(RIP_ENTRY_FORMAT, int(socket.AF_INET), int(entry.destination),
