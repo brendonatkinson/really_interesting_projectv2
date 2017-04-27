@@ -4,7 +4,8 @@
 
 import router
 import sys
-import sched, time, random
+import sched
+import time
 from parse import build_table
 
 if __name__ == "__main__":
@@ -13,19 +14,20 @@ if __name__ == "__main__":
         print("No config file present")
     
     else:
+
+        # Build the router from the conifg file
+        config = build_table(sys.argv[1])
+        currRouter = router.Router(config)
+
         try:
-            #Build the router from the conifg file
-            config = build_table(sys.argv[1])
-            router = router.Router(config)
 
             # Create Scheduler to run tasks
-            router.scheduler = sched.scheduler(time.time, time.sleep)
-            router.read_inputs()
-            router.send_table()
-            router.update_timers()
-            router.print_table()
-            router.scheduler.run()
+            currRouter.scheduler = sched.scheduler(time.time, time.sleep)
+            currRouter.read_inputs()
+            currRouter.send_table()
+            currRouter.update_timers()
+            currRouter.print_table()
+            currRouter.scheduler.run()
         except KeyboardInterrupt:
-            #Close Connections
-            router.close_connections()
-        
+            # Close Connections
+            currRouter.close_connections()
