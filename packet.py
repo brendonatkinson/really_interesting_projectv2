@@ -28,6 +28,10 @@ class RIP_Packet(object):
     def add_entry(self, entry):
         
         self.entries.append(entry)
+
+    def clear(self):
+
+        self.entries = []
         
     def remove_entry(self, entry):
         
@@ -41,13 +45,11 @@ class RIP_Packet(object):
         # Build the routing table entries
         for entry in self.entries:
 
-            # Poison reverse, any destinations achievable via this neighbour, set metric to infinity
-            metric = entry.metric
-            if entry.next_hop == address:
-                metric = RIP_INFINITY
+            # Poison reverse, any destinations achievable via this neighbour, set metric to infinity therefore omit
+            if entry.next_hop != address:
 
-            data += struct.pack(RIP_ENTRY_FORMAT, int(socket.AF_INET), int(entry.destination),
-                                int(entry.next_hop), 0, 0, int(metric))
+                data += struct.pack(RIP_ENTRY_FORMAT, int(socket.AF_INET), int(entry.destination),
+                                    int(entry.next_hop), 0, 0, int(entry.metric))
         
         return data
     
