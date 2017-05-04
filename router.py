@@ -9,7 +9,6 @@ import packet
 from entry import Entry
 
 RIP_RESPONSE_COMMAND = 2
-RIP_REQUEST_COMMAND = 1
 RIP_VERSION = 2
 RIP_INFINITY = 16
 
@@ -53,11 +52,6 @@ class Router(object):
         # Internal packets used to decode recieved data
         self.rip_packet_decoder = packet.RIP_Packet(int(self.router_id), RIP_RESPONSE_COMMAND)
         self.udp_packet_decoder = packet.UDP_Packet(self.output_port, 0)
-
-        # Ask for all routing tables
-        request_packet = packet.RIP_Packet(int(self.router_id), RIP_REQUEST_COMMAND)
-        for neighbour in self.routing_table:
-            self.send_packet(neighbour.address, request_packet.pack(neighbour.address))
 
         print("Router Initalised")
 
@@ -150,7 +144,7 @@ class Router(object):
                     # Get the RIP header data
                     header = rip_data[0]
                     received_id = header.router_id
-                    print("Recieved Update from " + str(received_id))
+                    # print("Recieved Update from " + str(received_id))
 
                     # Get the routing table corresponding to the router packet received from
                     # If new route discovered, set the router as the next hop
@@ -193,9 +187,9 @@ class Router(object):
                                 # Check if advertised destination has hop cost 16 indicating host unreachable
                                 if (advertised_destination.metric >= RIP_INFINITY and advertised_destination.next_hop
                                         == routing_table_entry.destination and not routing_table_entry.expired_flag):
-                                    # print("EXPIRING")
+                                    # print("EXPIRING " + str(routing_table_entry.destination))
                                     routing_table_entry.expired()
-                                    self.update_expired_entry(routing_table_entry,
+                                    self.update_routing_entry(routing_table_entry,
                                                               next_hop_entry.address,
                                                               routing_table_entry.metric,
                                                               routing_table_entry.destination)
@@ -245,7 +239,7 @@ class Router(object):
             # Check if triggered update required
 
             if len(self.update_packet.entries) > 0 and not self.trigger_suppress:
-                print("Sending Update")
+                print("Sending Triggered Update")
                 self.send_table_updates(self.update_packet)
                 self.update_packet.clear()
 
@@ -261,21 +255,15 @@ class Router(object):
     def update_routing_entry(self, entry, address, new_cost, next_hop):
         # print("Updating routing entry for: " + str(entry.destination))
         if new_cost >= RIP_INFINITY:
+            # print("Route to infinity: " + str(entry.destination))
             entry.metric = RIP_INFINITY
+            entry.expired()
         else:
             entry.metric = new_cost
         entry.address = address
         entry.next_hop = next_hop
-        entry.reset_timeout()
-
-    def update_expired_entry(self, entry, address, new_cost, next_hop):
-        # print("Updating routing entry for: " + str(entry.destination))
-        if new_cost >= RIP_INFINITY:
-            entry.metric = RIP_INFINITY
-        else:
-            entry.metric = new_cost
-        entry.address = address
-        entry.next_hop = next_hop
+        if not entry.expired_flag:
+            entry.reset_timeout()
 
     def reset_entry_timeout(self, entry):
         entry.reset_timeout()
@@ -358,8 +346,8 @@ class Router(object):
         self.scheduler.enter(5, 2, self.print_table, argument=())
         # Implement table output
         print("Own ID: {0}".format(self.router_id))
-        print(" ID ||First|Cost| Expired |Expiry |Garbage|")
-        print("----++-----+----+---------+-------+-------+--")
+        print(" ID ||First|Cost| Expired |   Expiry   |  Garbage   |")
+        print("----++-----+----+---------+------------+------------+--")
         for entry in self.routing_table:
             print(" {:>2} || {:>3} | {:>2} | {:<7} | {:<1f} | {:<1f} |".format(entry.destination, entry.next_hop,
                                                                 entry.metric, entry.expired_flag,
